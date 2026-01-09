@@ -6,7 +6,7 @@
 // For more information about the RecipeMD format, see https://recipemd.org
 
 /// RecipeMD library version.
-public let version = "1.0.0"
+public let version = "0.0.1"
 
 // MARK: - Quick Start
 //
