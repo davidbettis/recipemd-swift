@@ -239,6 +239,22 @@ struct RecipeMDParserTests {
         #expect(ingredient.amount?.unit == "cups")
     }
 
+    @Test("Parse ingredient with mixed unicode quarter fraction")
+    func parseIngredientWithMixedUnicodeQuarterFraction() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1¼ cups* flour
+        """
+
+        let recipe = try parser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.amount == 1.25)
+        #expect(ingredient.amount?.unit == "cups")
+    }
+
     @Test("Parse ingredient with comma decimal separator")
     func parseIngredientWithCommaDecimal() throws {
         let markdown = """
