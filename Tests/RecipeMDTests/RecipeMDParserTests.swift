@@ -641,6 +641,113 @@ struct RecipeMDParserTests {
         #expect(recipe.instructions != nil)
     }
 
+    // MARK: - Unit Truncation (opt-in)
+
+    @Test("Default parser preserves full unit text including parenthetical")
+    func defaultParserPreservesFullUnit() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T (15 g)* sugar
+        """
+
+        let recipe = try parser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.amount == 1.0)
+        #expect(ingredient.amount?.unit == "T (15 g)")
+    }
+
+    @Test("Truncate unit at numeric strips parenthetical alternate amount")
+    func truncateUnitStripsParenthetical() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T (15 g)* sugar
+        """
+
+        let lenientParser = RecipeMDParser(options: ParserOptions(discardSupplementalAmounts: true))
+        let recipe = try lenientParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.amount == 1.0)
+        #expect(ingredient.amount?.unit == "T")
+    }
+
+    @Test("Truncate unit at numeric handles slash-separated alternate")
+    func truncateUnitHandlesSlashAlternate() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T / 15 g* sugar
+        """
+
+        let lenientParser = RecipeMDParser(options: ParserOptions(discardSupplementalAmounts: true))
+        let recipe = try lenientParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.amount == 1.0)
+        #expect(ingredient.amount?.unit == "T")
+    }
+
+    @Test("Truncate unit at numeric handles tilde alternate")
+    func truncateUnitHandlesTildeAlternate() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T ~15g* sugar
+        """
+
+        let lenientParser = RecipeMDParser(options: ParserOptions(discardSupplementalAmounts: true))
+        let recipe = try lenientParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.amount == 1.0)
+        #expect(ingredient.amount?.unit == "T")
+    }
+
+    @Test("Truncate unit at numeric handles multiple parenthetical alternates")
+    func truncateUnitHandlesMultipleAlternates() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T (15g) (0.5 fl oz)* water
+        """
+
+        let lenientParser = RecipeMDParser(options: ParserOptions(discardSupplementalAmounts: true))
+        let recipe = try lenientParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.amount == 1.0)
+        #expect(ingredient.amount?.unit == "T")
+        #expect(ingredient.name == "water")
+    }
+
+    @Test("Truncate unit at numeric leaves normal units intact")
+    func truncateUnitLeavesNormalUnitsIntact() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *2 cups* flour
+        - *500 g* sugar
+        - *3* eggs
+        """
+
+        let lenientParser = RecipeMDParser(options: ParserOptions(discardSupplementalAmounts: true))
+        let recipe = try lenientParser.parse(markdown)
+        let ingredients = recipe.ingredientGroups[0].ingredients
+        #expect(ingredients[0].amount?.unit == "cups")
+        #expect(ingredients[1].amount?.unit == "g")
+        #expect(ingredients[2].amount?.unit == nil)
+    }
+
     // MARK: - Diagnostics
 
     @Test("Parse with diagnostics returns success")

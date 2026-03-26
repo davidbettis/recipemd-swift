@@ -2,7 +2,11 @@ import Markdown
 
 /// Parses RecipeMD-formatted Markdown into `Recipe` objects.
 public struct RecipeMDParser: Sendable {
-    public init() {}
+    private let options: ParserOptions
+
+    public init(options: ParserOptions = ParserOptions()) {
+        self.options = options
+    }
 
     /// Parses a RecipeMD string into a Recipe.
     /// - Parameter markdown: The RecipeMD-formatted string.
@@ -185,7 +189,12 @@ public struct RecipeMDParser: Sendable {
             return nil
         }
 
-        let unit = remaining.trimmingCharacters(in: .whitespaces)
+        var unit = remaining.trimmingCharacters(in: .whitespaces)
+
+        if options.discardSupplementalAmounts {
+            unit = truncateAtNumeric(unit)
+        }
+
         return Amount(amount: amountValue, unit: unit.isEmpty ? nil : unit, rawText: rawAmount)
     }
 
@@ -292,8 +301,23 @@ public struct RecipeMDParser: Sendable {
             return nil
         }
 
-        let unit = remaining.trimmingCharacters(in: .whitespaces)
+        var unit = remaining.trimmingCharacters(in: .whitespaces)
+
+        if options.discardSupplementalAmounts {
+            unit = truncateAtNumeric(unit)
+        }
+
         return Amount(amount: amountValue, unit: unit.isEmpty ? nil : unit, rawText: rawAmount)
+    }
+
+    /// Truncates a unit string at the first digit or unicode fraction character,
+    /// then trims trailing whitespace and punctuation.
+    private func truncateAtNumeric(_ unit: String) -> String {
+        guard let cutIndex = unit.firstIndex(where: { $0.isNumber || isUnicodeFraction($0) }) else {
+            return unit
+        }
+        let truncated = String(unit[..<cutIndex])
+        return truncated.trimmingCharacters(in: .letters.inverted)
     }
 
     private func parseAmountValue(_ text: String) -> (Double?, String, String) {
