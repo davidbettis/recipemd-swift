@@ -208,6 +208,109 @@ struct RecipeMDGeneratorTests {
         #expect(markdown.contains("**1½ cups**"))
     }
 
+    // MARK: - Supplemental Amounts
+
+    @Test("Generate ingredient with supplemental amount")
+    func generateWithSupplementalAmount() {
+        let recipe = Recipe(
+            title: "Recipe",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(
+                        name: "sugar",
+                        amount: Amount(1, unit: "T"),
+                        supplementalAmount: Amount(15, unit: "g")
+                    )
+                ])
+            ]
+        )
+
+        let options = GeneratorOptions(includeSupplementalAmounts: true)
+        let markdown = generator.generate(recipe, options: options)
+
+        #expect(markdown.contains("- *1 T (15 g)* sugar"))
+    }
+
+    @Test("Supplemental amount omitted by default")
+    func supplementalAmountOmittedByDefault() {
+        let recipe = Recipe(
+            title: "Recipe",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(
+                        name: "sugar",
+                        amount: Amount(1, unit: "T"),
+                        supplementalAmount: Amount(15, unit: "g")
+                    )
+                ])
+            ]
+        )
+
+        let markdown = generator.generate(recipe)
+
+        #expect(markdown.contains("- *1 T* sugar"))
+        #expect(!markdown.contains("15 g"))
+    }
+
+    @Test("Supplemental amount without unit")
+    func supplementalAmountWithoutUnit() {
+        let recipe = Recipe(
+            title: "Recipe",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(
+                        name: "eggs",
+                        amount: Amount(3),
+                        supplementalAmount: Amount(150)
+                    )
+                ])
+            ]
+        )
+
+        let options = GeneratorOptions(includeSupplementalAmounts: true)
+        let markdown = generator.generate(recipe, options: options)
+
+        #expect(markdown.contains("- *3 (150)* eggs"))
+    }
+
+    @Test("Supplemental amount with unicode fractions")
+    func supplementalAmountWithUnicodeFractions() {
+        let recipe = Recipe(
+            title: "Recipe",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(
+                        name: "butter",
+                        amount: Amount(amount: 0.5, unit: "cup", rawText: "1/2"),
+                        supplementalAmount: Amount(amount: 0.25, unit: "lb", rawText: "1/4")
+                    )
+                ])
+            ]
+        )
+
+        let options = GeneratorOptions(useUnicodeFractions: true, includeSupplementalAmounts: true)
+        let markdown = generator.generate(recipe, options: options)
+
+        #expect(markdown.contains("- *½ cup (¼ lb)* butter"))
+    }
+
+    @Test("Ingredient without supplemental amount unaffected by option")
+    func noSupplementalAmountUnaffected() {
+        let recipe = Recipe(
+            title: "Recipe",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(name: "flour", amount: Amount(2, unit: "cups"))
+                ])
+            ]
+        )
+
+        let options = GeneratorOptions(includeSupplementalAmounts: true)
+        let markdown = generator.generate(recipe, options: options)
+
+        #expect(markdown.contains("- *2 cups* flour"))
+    }
+
     // MARK: - Round-Trip Tests
 
     @Test("Round-trip: simple recipe")

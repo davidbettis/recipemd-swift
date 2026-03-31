@@ -6,12 +6,20 @@ public struct GeneratorOptions: Sendable {
     /// The heading level to use for ingredient groups (2-6).
     public var ingredientGroupHeadingLevel: Int
 
+    /// Whether to include supplemental amounts in parentheses after the primary amount.
+    ///
+    /// **Extra**: This uses the non-spec `supplementalAmount` property on `Ingredient`.
+    /// When enabled, ingredients with supplemental amounts render as e.g. `*1 T (15 g)* sugar`.
+    public var includeSupplementalAmounts: Bool
+
     public init(
         useUnicodeFractions: Bool = false,
-        ingredientGroupHeadingLevel: Int = 2
+        ingredientGroupHeadingLevel: Int = 2,
+        includeSupplementalAmounts: Bool = false
     ) {
         self.useUnicodeFractions = useUnicodeFractions
         self.ingredientGroupHeadingLevel = min(6, max(2, ingredientGroupHeadingLevel))
+        self.includeSupplementalAmounts = includeSupplementalAmounts
     }
 }
 
@@ -124,11 +132,26 @@ public struct RecipeMDGenerator: Sendable {
                 ? convertToUnicodeFraction(amount.rawText)
                 : amount.rawText
 
+            var amountPortion: String
             if let unit = amount.unit {
-                parts.append("*\(amountText) \(unit)*")
+                amountPortion = "\(amountText) \(unit)"
             } else {
-                parts.append("*\(amountText)*")
+                amountPortion = amountText
             }
+
+            // Append supplemental amount in parentheses if enabled
+            if options.includeSupplementalAmounts, let supplemental = ingredient.supplementalAmount {
+                let suppText = options.useUnicodeFractions
+                    ? convertToUnicodeFraction(supplemental.rawText)
+                    : supplemental.rawText
+                if let suppUnit = supplemental.unit {
+                    amountPortion += " (\(suppText) \(suppUnit))"
+                } else {
+                    amountPortion += " (\(suppText))"
+                }
+            }
+
+            parts.append("*\(amountPortion)*")
         }
 
         // Name (with optional link)
