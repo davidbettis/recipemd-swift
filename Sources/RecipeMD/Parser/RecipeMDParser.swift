@@ -1,3 +1,4 @@
+import Foundation
 import Markdown
 
 /// Parses RecipeMD-formatted Markdown into `Recipe` objects.
@@ -191,7 +192,7 @@ public struct RecipeMDParser: Sendable {
 
         var unit = remaining.trimmingCharacters(in: .whitespaces)
 
-        if options.discardSupplementalAmounts {
+        if options.discardSupplementalAmounts || options.extractSupplementalAmounts {
             unit = truncateAtNumeric(unit)
         }
 
@@ -244,6 +245,7 @@ public struct RecipeMDParser: Sendable {
 
         let children = Array(paragraph.children)
         var amount: Amount?
+        var supplemental: Amount?
         var name: String = ""
         var link: String?
 
@@ -252,7 +254,7 @@ public struct RecipeMDParser: Sendable {
         // Check for amount in emphasis (italic): *1 cup* or *2*
         if index < children.count, let emphasis = children[index] as? Emphasis {
             let amountText = emphasis.plainText
-            amount = parseAmountWithUnit(amountText)
+            (amount, supplemental) = parseAmountWithUnit(amountText)
             index += 1
         }
 
@@ -286,28 +288,32 @@ public struct RecipeMDParser: Sendable {
 
         guard !name.isEmpty else { return nil }
 
-        return Ingredient(name: name, amount: amount, link: link)
+        return Ingredient(name: name, amount: amount, link: link, supplementalAmount: supplemental)
     }
 
-    private func parseAmountWithUnit(_ text: String) -> Amount? {
+    /// Returns (primary amount, supplemental amount extracted when option enabled).
+    private func parseAmountWithUnit(_ text: String) -> (Amount?, Amount?) {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return nil }
+        guard !trimmed.isEmpty else { return (nil, nil) }
 
         // Try to parse amount from the beginning
         let (value, rawAmount, remaining) = parseAmountValue(trimmed)
 
         guard let amountValue = value else {
             // No valid amount found
-            return nil
+            return (nil, nil)
         }
 
         var unit = remaining.trimmingCharacters(in: .whitespaces)
+        var supplemental: Amount?
 
-        if options.discardSupplementalAmounts {
+        if options.extractSupplementalAmounts {
+            (unit, supplemental) = extractSupplemental(from: unit)
+        } else if options.discardSupplementalAmounts {
             unit = truncateAtNumeric(unit)
         }
 
-        return Amount(amount: amountValue, unit: unit.isEmpty ? nil : unit, rawText: rawAmount)
+        return (Amount(amount: amountValue, unit: unit.isEmpty ? nil : unit, rawText: rawAmount), supplemental)
     }
 
     /// Truncates a unit string at the first digit or unicode fraction character,
@@ -318,6 +324,43 @@ public struct RecipeMDParser: Sendable {
         }
         let truncated = String(unit[..<cutIndex])
         return truncated.trimmingCharacters(in: .letters.inverted)
+    }
+
+    /// Truncates the unit at the first supplemental numeric and parses the
+    /// remainder into an ``Amount``.
+    ///
+    /// Returns the cleaned primary unit and an optional supplemental amount.
+    private func extractSupplemental(from unit: String) -> (String, Amount?) {
+        guard let cutIndex = unit.firstIndex(where: { $0.isNumber || isUnicodeFraction($0) }) else {
+            return (unit, nil)
+        }
+
+        let primaryUnit = String(unit[..<cutIndex])
+            .trimmingCharacters(in: .letters.inverted)
+
+        let supplementalText = String(unit[cutIndex...])
+            .trimmingCharacters(in: .whitespaces)
+            // Strip surrounding parens if present
+            .trimmingCharacters(in: CharacterSet(charactersIn: "()"))
+            .trimmingCharacters(in: .whitespaces)
+
+        guard !supplementalText.isEmpty else {
+            return (primaryUnit, nil)
+        }
+
+        let (value, rawAmount, remaining) = parseAmountValue(supplementalText)
+        guard let amountValue = value else {
+            return (primaryUnit, nil)
+        }
+
+        let suppUnit = remaining.trimmingCharacters(in: .whitespaces)
+        let supplemental = Amount(
+            amount: amountValue,
+            unit: suppUnit.isEmpty ? nil : suppUnit,
+            rawText: rawAmount
+        )
+
+        return (primaryUnit, supplemental)
     }
 
     private func parseAmountValue(_ text: String) -> (Double?, String, String) {

@@ -748,6 +748,188 @@ struct RecipeMDParserTests {
         #expect(ingredients[2].amount?.unit == nil)
     }
 
+    // MARK: - Supplemental Amount Extraction (opt-in, extra)
+
+    @Test("Extract supplemental amount from parenthetical")
+    func extractSupplementalFromParenthetical() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T (15 g)* sugar
+        """
+
+        let extractParser = RecipeMDParser(options: ParserOptions(extractSupplementalAmounts: true))
+        let recipe = try extractParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.amount == 1.0)
+        #expect(ingredient.amount?.unit == "T")
+        #expect(ingredient.supplementalAmount?.amount == 15.0)
+        #expect(ingredient.supplementalAmount?.unit == "g")
+        #expect(ingredient.supplementalAmount?.rawText == "15")
+    }
+
+    @Test("Extract supplemental amount from slash-separated alternate")
+    func extractSupplementalFromSlashAlternate() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T / 15 g* sugar
+        """
+
+        let extractParser = RecipeMDParser(options: ParserOptions(extractSupplementalAmounts: true))
+        let recipe = try extractParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.unit == "T")
+        #expect(ingredient.supplementalAmount?.amount == 15.0)
+        #expect(ingredient.supplementalAmount?.unit == "g")
+    }
+
+    @Test("Extract supplemental amount from tilde alternate")
+    func extractSupplementalFromTildeAlternate() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T ~15g* sugar
+        """
+
+        let extractParser = RecipeMDParser(options: ParserOptions(extractSupplementalAmounts: true))
+        let recipe = try extractParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.amount?.unit == "T")
+        #expect(ingredient.supplementalAmount?.amount == 15.0)
+        #expect(ingredient.supplementalAmount?.unit == "g")
+    }
+
+    @Test("Extract supplemental leaves normal units intact with nil supplemental")
+    func extractSupplementalLeavesNormalUnitsIntact() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *2 cups* flour
+        - *500 g* sugar
+        - *3* eggs
+        """
+
+        let extractParser = RecipeMDParser(options: ParserOptions(extractSupplementalAmounts: true))
+        let recipe = try extractParser.parse(markdown)
+        let ingredients = recipe.ingredientGroups[0].ingredients
+        #expect(ingredients[0].amount?.unit == "cups")
+        #expect(ingredients[0].supplementalAmount == nil)
+        #expect(ingredients[1].amount?.unit == "g")
+        #expect(ingredients[1].supplementalAmount == nil)
+        #expect(ingredients[2].amount?.unit == nil)
+        #expect(ingredients[2].supplementalAmount == nil)
+    }
+
+    @Test("Default parser does not populate supplemental amount")
+    func defaultParserNoSupplementalAmount() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T (15 g)* sugar
+        """
+
+        let recipe = try parser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.supplementalAmount == nil)
+        #expect(ingredient.amount?.unit == "T (15 g)")
+    }
+
+    @Test("Extract supplemental does not apply to yields")
+    func extractSupplementalDoesNotApplyToYields() throws {
+        let markdown = """
+        # Recipe
+
+        **4 Servings (800 g)**
+
+        ---
+
+        - ingredient
+        """
+
+        let extractParser = RecipeMDParser(options: ParserOptions(extractSupplementalAmounts: true))
+        let recipe = try extractParser.parse(markdown)
+        #expect(recipe.yield.amount[0].amount == 4.0)
+        #expect(recipe.yield.amount[0].unit == "Servings")
+    }
+
+    // MARK: - Supplemental Formatting Helpers (extra)
+
+    @Test("formattedAmountWithSupplemental includes parenthetical")
+    func formattedAmountWithSupplemental() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T (15 g)* sugar
+        """
+
+        let extractParser = RecipeMDParser(options: ParserOptions(extractSupplementalAmounts: true))
+        let recipe = try extractParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.formattedAmountWithSupplemental == "1 T (15 g)")
+    }
+
+    @Test("formattedAmountWithSupplemental without supplemental returns plain amount")
+    func formattedAmountWithSupplementalPlain() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *2 cups* flour
+        """
+
+        let recipe = try parser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.formattedAmountWithSupplemental == "2 cups")
+    }
+
+    @Test("formattedAmountWithSupplemental returns nil when no amount")
+    func formattedAmountWithSupplementalNil() {
+        let ingredient = Ingredient(name: "salt")
+        #expect(ingredient.formattedAmountWithSupplemental == nil)
+    }
+
+    @Test("markdownWithSupplemental formats full list item")
+    func markdownWithSupplemental() throws {
+        let markdown = """
+        # Recipe
+
+        ---
+
+        - *1 T (15 g)* sugar
+        """
+
+        let extractParser = RecipeMDParser(options: ParserOptions(extractSupplementalAmounts: true))
+        let recipe = try extractParser.parse(markdown)
+        let ingredient = recipe.ingredientGroups[0].ingredients[0]
+        #expect(ingredient.markdownWithSupplemental == "- *1 T (15 g)* sugar")
+    }
+
+    @Test("markdownWithSupplemental without supplemental")
+    func markdownWithSupplementalPlain() {
+        let ingredient = Ingredient(name: "flour", amount: Amount(2, unit: "cups"))
+        #expect(ingredient.markdownWithSupplemental == "- *2 cups* flour")
+    }
+
+    @Test("markdownWithSupplemental without amount")
+    func markdownWithSupplementalNoAmount() {
+        let ingredient = Ingredient(name: "salt")
+        #expect(ingredient.markdownWithSupplemental == "- salt")
+    }
+
     // MARK: - Diagnostics
 
     @Test("Parse with diagnostics returns success")

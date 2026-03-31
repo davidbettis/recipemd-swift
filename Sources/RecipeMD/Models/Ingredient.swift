@@ -40,20 +40,31 @@ public struct Ingredient: Sendable, Equatable, Codable {
     /// Rendered as a Markdown link: `[name](link)`.
     public var link: String?
 
+    /// An alternative amount extracted from non-standard annotations.
+    ///
+    /// **Extra**: This property is not part of the RecipeMD specification.
+    /// It is only populated when the parser's `extractSupplementalAmounts` option
+    /// is enabled. For example, `*1 T (15 g)* sugar` would produce a primary
+    /// amount of `1 T` and a supplemental amount of `15 g`.
+    public var supplementalAmount: Amount?
+
     /// Creates a new ingredient.
     ///
     /// - Parameters:
     ///   - name: The ingredient name (required).
     ///   - amount: The quantity amount with optional unit.
     ///   - link: URL or path to a linked recipe.
+    ///   - supplementalAmount: An alternative amount (extra, not part of the RecipeMD spec).
     public init(
         name: String,
         amount: Amount? = nil,
-        link: String? = nil
+        link: String? = nil,
+        supplementalAmount: Amount? = nil
     ) {
         self.name = name
         self.amount = amount
         self.link = link
+        self.supplementalAmount = supplementalAmount
     }
 }
 
@@ -76,5 +87,40 @@ extension Ingredient {
     /// Examples: "2 cups", "1/2 teaspoon", "3"
     public var formattedAmount: String? {
         amount?.formatted
+    }
+
+    /// A formatted string including the supplemental amount in parentheses.
+    ///
+    /// **Extra**: Uses the non-spec `supplementalAmount` property.
+    /// Returns `nil` if no amount is set. If a supplemental amount is present
+    /// it is appended in parentheses, e.g. "1 T (15 g)".
+    public var formattedAmountWithSupplemental: String? {
+        guard let primary = amount?.formatted else { return nil }
+        guard let supplemental = supplementalAmount?.formatted else { return primary }
+        return "\(primary) (\(supplemental))"
+    }
+
+    /// The ingredient formatted as a RecipeMD list item, with the supplemental
+    /// amount included in the italicized amount portion.
+    ///
+    /// **Extra**: Uses the non-spec `supplementalAmount` property.
+    /// Examples:
+    /// - `- *1 T (15 g)* sugar`
+    /// - `- *2 cups* flour` (no supplemental)
+    /// - `- salt` (no amount)
+    public var markdownWithSupplemental: String {
+        var parts: [String] = []
+
+        if let amountText = formattedAmountWithSupplemental {
+            parts.append("*\(amountText)*")
+        }
+
+        if let link = link {
+            parts.append("[\(name)](\(link))")
+        } else {
+            parts.append(name)
+        }
+
+        return "- \(parts.joined(separator: " "))"
     }
 }
