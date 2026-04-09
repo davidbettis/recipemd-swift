@@ -55,6 +55,7 @@ public struct RecipeMDGenerator: Sendable {
         // Tags
         if !recipe.tags.isEmpty {
             lines.append("*\(recipe.tags.joined(separator: ", "))*")
+            lines.append("")
         }
 
         // Yield
@@ -70,9 +71,6 @@ public struct RecipeMDGenerator: Sendable {
                 }
             }.joined(separator: ", ")
             lines.append("**\(yieldsText)**")
-        }
-
-        if !recipe.tags.isEmpty || recipe.yield.hasAmounts {
             lines.append("")
         }
 

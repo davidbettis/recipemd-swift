@@ -930,6 +930,156 @@ struct RecipeMDParserTests {
         #expect(ingredient.markdownWithSupplemental == "- salt")
     }
 
+    // MARK: - Resilience to Missing Blank Lines
+
+    @Test("Parse tags with no blank line before them")
+    func parseTagsNoBlankLine() throws {
+        let markdown = """
+        # Recipe
+        *vegan, quick*
+
+        ---
+
+        - ingredient
+        """
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.tags == ["vegan", "quick"])
+    }
+
+    @Test("Parse yield with no blank line before it")
+    func parseYieldNoBlankLine() throws {
+        let markdown = """
+        # Recipe
+        **4 Servings**
+
+        ---
+
+        - ingredient
+        """
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.yield.amount.count == 1)
+        #expect(recipe.yield.amount[0].amount == 4.0)
+    }
+
+    @Test("Parse description and tags with no blank line between them")
+    func parseDescriptionAndTagsNoBlankLine() throws {
+        let markdown = """
+        # Recipe
+
+        A tasty dish.
+        *vegan, quick*
+
+        ---
+
+        - ingredient
+        """
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.description == "A tasty dish.")
+        #expect(recipe.tags == ["vegan", "quick"])
+    }
+
+    @Test("Parse description and yield with no blank line between them")
+    func parseDescriptionAndYieldNoBlankLine() throws {
+        let markdown = """
+        # Recipe
+
+        A tasty dish.
+        **4 Servings**
+
+        ---
+
+        - ingredient
+        """
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.description == "A tasty dish.")
+        #expect(recipe.yield.amount.count == 1)
+        #expect(recipe.yield.amount[0].amount == 4.0)
+    }
+
+    @Test("Parse tags and yield with no blank line between them")
+    func parseTagsAndYieldNoBlankLine() throws {
+        let markdown = """
+        # Recipe
+
+        *vegan, quick*
+        **4 Servings**
+
+        ---
+
+        - ingredient
+        """
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.tags == ["vegan", "quick"])
+        #expect(recipe.yield.amount.count == 1)
+        #expect(recipe.yield.amount[0].amount == 4.0)
+    }
+
+    @Test("Parse description, tags, and yield with no blank lines between any of them")
+    func parseAllMetadataNoBlankLines() throws {
+        let markdown = """
+        # Recipe
+        A tasty dish.
+        *vegan, quick*
+        **4 Servings**
+
+        ---
+
+        - ingredient
+        """
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.description == "A tasty dish.")
+        #expect(recipe.tags == ["vegan", "quick"])
+        #expect(recipe.yield.amount.count == 1)
+        #expect(recipe.yield.amount[0].amount == 4.0)
+    }
+
+    @Test("Parse tags only with no blank lines anywhere in metadata")
+    func parseTagsOnlyNoBlankLines() throws {
+        let markdown = "# Recipe\n*vegan*\n\n---\n\n- ingredient"
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.tags == ["vegan"])
+        #expect(recipe.description == nil)
+    }
+
+    @Test("Parse yield only with no blank lines anywhere in metadata")
+    func parseYieldOnlyNoBlankLines() throws {
+        let markdown = "# Recipe\n**6 Servings**\n\n---\n\n- ingredient"
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.yield.amount[0].amount == 6.0)
+        #expect(recipe.description == nil)
+    }
+
+    @Test("Parse multi-paragraph description with tags and yield after last paragraph")
+    func parseMultiParagraphDescriptionWithMetadata() throws {
+        let markdown = """
+        # Recipe
+
+        First paragraph.
+
+        Second paragraph.
+        *vegan, quick*
+        **4 Servings**
+
+        ---
+
+        - ingredient
+        """
+
+        let recipe = try parser.parse(markdown)
+        #expect(recipe.description == "First paragraph.\n\nSecond paragraph.")
+        #expect(recipe.tags == ["vegan", "quick"])
+        #expect(recipe.yield.amount.count == 1)
+        #expect(recipe.yield.amount[0].amount == 4.0)
+    }
+
     // MARK: - Diagnostics
 
     @Test("Parse with diagnostics returns success")

@@ -311,6 +311,158 @@ struct RecipeMDGeneratorTests {
         #expect(markdown.contains("- *2 cups* flour"))
     }
 
+    // MARK: - Blank Line Formatting
+
+    /// Returns the lines of the markdown split by newline.
+    private func lines(_ markdown: String) -> [String] {
+        markdown.components(separatedBy: "\n")
+    }
+
+    /// Returns true if the markdown contains no consecutive blank lines.
+    private func hasNoConsecutiveBlankLines(_ markdown: String) -> Bool {
+        !markdown.contains("\n\n\n")
+    }
+
+    @Test("Blank lines: title only (no description, tags, or yield)")
+    func blankLinesTitleOnly() {
+        let recipe = Recipe(
+            title: "Test",
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "item")])]
+        )
+        let ls = lines(generator.generate(recipe))
+        #expect(ls[0] == "# Test")
+        #expect(ls[1] == "")
+        #expect(ls[2] == "---")
+        #expect(hasNoConsecutiveBlankLines(generator.generate(recipe)))
+    }
+
+    @Test("Blank lines: description only (no tags or yield)")
+    func blankLinesDescriptionOnly() {
+        let recipe = Recipe(
+            title: "Test",
+            description: "Desc.",
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "item")])]
+        )
+        let ls = lines(generator.generate(recipe))
+        #expect(ls[0] == "# Test")
+        #expect(ls[1] == "")
+        #expect(ls[2] == "Desc.")
+        #expect(ls[3] == "")
+        #expect(ls[4] == "---")
+        #expect(hasNoConsecutiveBlankLines(generator.generate(recipe)))
+    }
+
+    @Test("Blank lines: tags only (no description or yield)")
+    func blankLinesTagsOnly() {
+        let recipe = Recipe(
+            title: "Test",
+            tags: ["vegan"],
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "item")])]
+        )
+        let ls = lines(generator.generate(recipe))
+        #expect(ls[0] == "# Test")
+        #expect(ls[1] == "")
+        #expect(ls[2] == "*vegan*")
+        #expect(ls[3] == "")
+        #expect(ls[4] == "---")
+        #expect(hasNoConsecutiveBlankLines(generator.generate(recipe)))
+    }
+
+    @Test("Blank lines: yield only (no description or tags)")
+    func blankLinesYieldOnly() {
+        let recipe = Recipe(
+            title: "Test",
+            yield: Yield(amount: [Amount(4, unit: "Servings")]),
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "item")])]
+        )
+        let ls = lines(generator.generate(recipe))
+        #expect(ls[0] == "# Test")
+        #expect(ls[1] == "")
+        #expect(ls[2] == "**4 Servings**")
+        #expect(ls[3] == "")
+        #expect(ls[4] == "---")
+        #expect(hasNoConsecutiveBlankLines(generator.generate(recipe)))
+    }
+
+    @Test("Blank lines: description + tags (no yield)")
+    func blankLinesDescriptionAndTags() {
+        let recipe = Recipe(
+            title: "Test",
+            description: "Desc.",
+            tags: ["vegan"],
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "item")])]
+        )
+        let ls = lines(generator.generate(recipe))
+        #expect(ls[0] == "# Test")
+        #expect(ls[1] == "")
+        #expect(ls[2] == "Desc.")
+        #expect(ls[3] == "")
+        #expect(ls[4] == "*vegan*")
+        #expect(ls[5] == "")
+        #expect(ls[6] == "---")
+        #expect(hasNoConsecutiveBlankLines(generator.generate(recipe)))
+    }
+
+    @Test("Blank lines: description + yield (no tags)")
+    func blankLinesDescriptionAndYield() {
+        let recipe = Recipe(
+            title: "Test",
+            description: "Desc.",
+            yield: Yield(amount: [Amount(4, unit: "Servings")]),
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "item")])]
+        )
+        let ls = lines(generator.generate(recipe))
+        #expect(ls[0] == "# Test")
+        #expect(ls[1] == "")
+        #expect(ls[2] == "Desc.")
+        #expect(ls[3] == "")
+        #expect(ls[4] == "**4 Servings**")
+        #expect(ls[5] == "")
+        #expect(ls[6] == "---")
+        #expect(hasNoConsecutiveBlankLines(generator.generate(recipe)))
+    }
+
+    @Test("Blank lines: tags + yield (no description)")
+    func blankLinesTagsAndYield() {
+        let recipe = Recipe(
+            title: "Test",
+            tags: ["vegan"],
+            yield: Yield(amount: [Amount(4, unit: "Servings")]),
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "item")])]
+        )
+        let ls = lines(generator.generate(recipe))
+        #expect(ls[0] == "# Test")
+        #expect(ls[1] == "")
+        #expect(ls[2] == "*vegan*")
+        #expect(ls[3] == "")
+        #expect(ls[4] == "**4 Servings**")
+        #expect(ls[5] == "")
+        #expect(ls[6] == "---")
+        #expect(hasNoConsecutiveBlankLines(generator.generate(recipe)))
+    }
+
+    @Test("Blank lines: description + tags + yield (all present)")
+    func blankLinesAllOptionalFields() {
+        let recipe = Recipe(
+            title: "Test",
+            description: "Desc.",
+            tags: ["vegan"],
+            yield: Yield(amount: [Amount(4, unit: "Servings")]),
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "item")])]
+        )
+        let ls = lines(generator.generate(recipe))
+        #expect(ls[0] == "# Test")
+        #expect(ls[1] == "")
+        #expect(ls[2] == "Desc.")
+        #expect(ls[3] == "")
+        #expect(ls[4] == "*vegan*")
+        #expect(ls[5] == "")
+        #expect(ls[6] == "**4 Servings**")
+        #expect(ls[7] == "")
+        #expect(ls[8] == "---")
+        #expect(hasNoConsecutiveBlankLines(generator.generate(recipe)))
+    }
+
     // MARK: - Round-Trip Tests
 
     @Test("Round-trip: simple recipe")

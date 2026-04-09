@@ -82,6 +82,11 @@ public struct RecipeMDParser: Sendable {
     // MARK: - Metadata Section Parsing
 
     /// Parses the metadata section (between title and first ---) into description, tags, and yield.
+    ///
+    /// Resilient to missing blank lines: description, tags, and yield may appear in the same
+    /// paragraph (soft-break separated) or in separate paragraphs. Each child node in a paragraph
+    /// is classified individually — Emphasis nodes are tried as tags, Strong nodes as yield, and
+    /// plain text accumulates into description.
     private func parseMetadataSection(_ nodes: [any Markup]) -> (String?, [String], Yield) {
         var descriptionParts: [String] = []
         var tags: [String] = []
@@ -89,66 +94,44 @@ public struct RecipeMDParser: Sendable {
 
         for node in nodes {
             guard let paragraph = node as? Paragraph else { continue }
-            let children = Array(paragraph.children)
 
-            // Check for tags/yields paragraph
-            // Can be: single Emphasis (tags), single Strong (yields), or both on consecutive lines
-            let (foundTags, foundAmounts, isMetadata) = parseTagsAndYieldsFromParagraph(children)
+            var textBuffer = ""
 
-            if isMetadata {
-                if !foundTags.isEmpty { tags = foundTags }
-                if !foundAmounts.isEmpty { yieldAmounts = foundAmounts }
-                continue
+            func flushText() {
+                let trimmed = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { descriptionParts.append(trimmed) }
+                textBuffer = ""
             }
 
-            // Otherwise treat as description
-            let text = paragraph.plainText.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !text.isEmpty {
-                descriptionParts.append(text)
+            for child in paragraph.children {
+                if let emphasis = child as? Emphasis {
+                    let parsedTags = parseTags(emphasis)
+                    if !parsedTags.isEmpty {
+                        flushText()
+                        tags = parsedTags
+                    } else {
+                        textBuffer += emphasis.plainText
+                    }
+                } else if let strong = child as? Strong {
+                    let parsedAmounts = parseYieldAmounts(strong)
+                    if !parsedAmounts.isEmpty {
+                        flushText()
+                        yieldAmounts = parsedAmounts
+                    } else {
+                        textBuffer += strong.plainText
+                    }
+                } else if child is SoftBreak || child is LineBreak {
+                    textBuffer += " "
+                } else if let text = child as? Text {
+                    textBuffer += text.string
+                }
             }
+
+            flushText()
         }
 
         let description = descriptionParts.isEmpty ? nil : descriptionParts.joined(separator: "\n\n")
         return (description, tags, Yield(amount: yieldAmounts))
-    }
-
-    /// Parses tags and yields from a paragraph's children.
-    /// Returns (tags, yieldAmounts, isMetadataParagraph).
-    private func parseTagsAndYieldsFromParagraph(_ children: [any Markup]) -> ([String], [Amount], Bool) {
-        var tags: [String] = []
-        var amounts: [Amount] = []
-        var hasEmphasisOrStrong = false
-        var hasOtherContent = false
-
-        for child in children {
-            if let emphasis = child as? Emphasis {
-                let parsedTags = parseTags(emphasis)
-                if !parsedTags.isEmpty {
-                    tags = parsedTags
-                    hasEmphasisOrStrong = true
-                }
-            } else if let strong = child as? Strong {
-                let parsedAmounts = parseYieldAmounts(strong)
-                if !parsedAmounts.isEmpty {
-                    amounts = parsedAmounts
-                    hasEmphasisOrStrong = true
-                }
-            } else if child is SoftBreak || child is LineBreak {
-                // Ignore line breaks between tags and yields
-                continue
-            } else if let text = child as? Text {
-                // Check if it's just whitespace
-                if !text.string.trimmingCharacters(in: .whitespaces).isEmpty {
-                    hasOtherContent = true
-                }
-            } else {
-                hasOtherContent = true
-            }
-        }
-
-        // It's a metadata paragraph if it only contains Emphasis/Strong (tags/yields)
-        let isMetadata = hasEmphasisOrStrong && !hasOtherContent
-        return (tags, amounts, isMetadata)
     }
 
     // MARK: - Tags Parsing
